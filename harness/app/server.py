@@ -1,13 +1,16 @@
-"""FastAPI server exposing the harness.
+"""FastAPI server exposing the harness — every endpoint routes through the
+shared :class:`~harness.router.HarnessRouter`.
 
 Endpoints:
-  GET  /health           liveness + which backends are active
-  POST /perceive         {"input": ...}        -> JEPA state description
-  POST /chat             {"goal": ...}         -> agent answer + trace
-  POST /eval             {"data_path": ...}    -> eval metrics
+  GET  /health             liveness + which backends are active
+  POST /perceive           {"input": ...}                  -> JEPA description
+  POST /ask                {"question": ..., "k"?: int}    -> RAG answer + sources
+  POST /ingest             {"paths": [...], "append"?: b}  -> index documents
+  POST /chat               {"goal": ..., "trace"?: bool}   -> agent answer + trace
+  POST /eval               {"data_path": ...}              -> eval metrics
+  POST /route              {"kind": ..., "payload": {...}} -> generic dispatch
 
-Built with `create_app(config)` so it can be embedded or launched via
-`harness serve`. FastAPI/uvicorn are optional (`serve` extras).
+Built with `create_app(config)`; FastAPI/uvicorn are optional (`serve` extras).
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ from harness.config import HarnessConfig
 def create_app(config: HarnessConfig | None = None):
     """Construct the FastAPI app. Imports FastAPI lazily so core stays light."""
     try:
-        from fastapi import FastAPI
+        from fastapi import FastAPI, HTTPException
         from pydantic import BaseModel
     except Exception as e:  # pragma: no cover
         raise RuntimeError(
@@ -29,18 +32,22 @@ def create_app(config: HarnessConfig | None = None):
 
     config = config or HarnessConfig()
 
-    from harness.agents.agent import Agent
-    from harness.jepa.interface import JEPABridge
-    from harness.llm.model import LocalLLM
+    from harness.router import HarnessRouter, RouteError
 
-    # Shared, lazily-initialized components.
-    bridge = JEPABridge(config)
-    llm = LocalLLM(config)
+    router = HarnessRouter(config)
 
     app = FastAPI(title="Harness", version="0.1.0")
 
     class PerceiveRequest(BaseModel):
         input: Any
+
+    class AskRequest(BaseModel):
+        question: str
+        k: int | None = None
+
+    class IngestRequest(BaseModel):
+        paths: list[str]
+        append: bool = True
 
     class ChatRequest(BaseModel):
         goal: str
@@ -49,44 +56,45 @@ def create_app(config: HarnessConfig | None = None):
     class EvalRequest(BaseModel):
         data_path: str
 
+    class RouteRequest(BaseModel):
+        kind: str
+        payload: dict[str, Any] = {}
+
+    def _route(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return router.route(kind, payload).output
+        except RouteError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
     @app.get("/health")
     def health() -> dict:
-        return {
-            "status": "ok",
-            "llm_backend": llm.kind,
-            "jepa_backend": bridge.encoder.backend,
-            "base_model": config.base_model,
-        }
+        return _route("health", {})
 
     @app.post("/perceive")
     def perceive(req: PerceiveRequest) -> dict:
-        desc = bridge.describe(req.input)
-        return {
-            "summary": desc.summary,
-            "norm": desc.norm,
-            "top_features": desc.top_features,
-            "nearest_reference": desc.nearest_reference,
-            "prompt_block": desc.as_prompt_block(),
-        }
+        return _route("perceive", {"input": req.input})
+
+    @app.post("/ask")
+    def ask(req: AskRequest) -> dict:
+        return _route("ask", {"question": req.question, "k": req.k})
+
+    @app.post("/ingest")
+    def ingest(req: IngestRequest) -> dict:
+        return _route("ingest", {"paths": req.paths, "append": req.append})
 
     @app.post("/chat")
     def chat(req: ChatRequest) -> dict:
-        # Fresh agent per request so memory doesn't leak across users.
-        agent = Agent(config, llm=llm, bridge=bridge)
-        result = agent.run(req.goal)
-        out: dict = {"answer": result.answer, "stopped_reason": result.stopped_reason}
-        if req.trace:
-            out["trace"] = [
-                {"action": s.action, "input": s.action_input, "observation": s.observation}
-                for s in result.steps
-            ]
-        return out
+        return _route("chat", {"goal": req.goal, "trace": req.trace})
 
     @app.post("/eval")
     def eval_(req: EvalRequest) -> dict:
         from harness.llm.eval import evaluate_file
 
-        result = evaluate_file(req.data_path, llm=llm, config=config)
+        result = evaluate_file(req.data_path, llm=router.llm, config=config)
         return {"n": result.n, "exact_match": result.exact_match, "token_f1": result.token_f1}
+
+    @app.post("/route")
+    def route(req: RouteRequest) -> dict:
+        return _route(req.kind, req.payload)
 
     return app

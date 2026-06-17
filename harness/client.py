@@ -40,5 +40,15 @@ class HarnessClient:
     def chat(self, goal: str, trace: bool = False) -> dict[str, Any]:
         return self._request("POST", "/chat", {"goal": goal, "trace": trace})
 
+    def ask(self, question: str, k: int | None = None) -> dict[str, Any]:
+        return self._request("POST", "/ask", {"question": question, "k": k})
+
+    def ingest(self, paths: list[str], append: bool = True) -> dict[str, Any]:
+        return self._request("POST", "/ingest", {"paths": paths, "append": append})
+
     def eval(self, data_path: str) -> dict[str, Any]:
         return self._request("POST", "/eval", {"data_path": data_path})
+
+    def route(self, kind: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Generic dispatch through the harness router."""
+        return self._request("POST", "/route", {"kind": kind, "payload": payload or {}})

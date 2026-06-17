@@ -12,5 +12,5 @@ def test_default_points_at_localhost():
 
 def test_request_methods_exist():
     hc = HarnessClient()
-    for name in ("health", "perceive", "chat", "eval"):
+    for name in ("health", "perceive", "chat", "ask", "ingest", "eval", "route"):
         assert callable(getattr(hc, name))

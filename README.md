@@ -77,24 +77,41 @@ harness serve --port 8000
 ```
 harness/
   config.py            central configuration
+  router.py            HarnessRouter: one entry point that dispatches to every capability
+  client.py            stdlib HTTP client (for PC2/Mac -> host over the LAN)
   jepa/
     encoder.py         JEPA encoder (real loader + deterministic fallback)
     interface.py       JEPABridge: embeddings -> text/projection for the LLM
   llm/
-    model.py           local causal-LM loader (+ echo fallback)
+    model.py           backend resolution: ollama -> transformers -> echo
+    ollama.py          stdlib client for an Ollama-served model (e.g. Qwen3)
     data.py            JSONL instruction dataset prep
     train.py           LoRA/QLoRA fine-tuning
     eval.py            evaluation loop + metrics
+  rag/
+    embedder.py        embeddings (Ollama or offline hashing fallback)
+    store.py           numpy vector store + cosine search
+    ingest.py          document loading + chunking
+    pipeline.py        RAG: retrieve project knowledge, answer, cite sources
   agents/
     tools.py           Tool base + registry + built-in tools
     memory.py          conversation/working memory
     agent.py           ReAct orchestration loop
   app/
-    cli.py             `harness` command-line entry point
-    server.py          FastAPI server
+    cli.py             `harness` command-line entry point (routes via HarnessRouter)
+    server.py          FastAPI server (every endpoint routes via HarnessRouter)
 examples/              runnable examples + sample state
 data/                  sample training data
 tests/                 fallback-path tests (no heavy deps required)
+```
+
+### The harness router
+
+Every surface — the CLI, the HTTP server, and therefore every machine — goes
+through a single `HarnessRouter` that dispatches a typed request (`perceive`,
+`ask`, `ingest`, `chat`/`agent`, `health`) to the matching capability and owns
+the shared LLM/JEPA/RAG components. The server is just a thin HTTP skin over the
+router, so PC2 and the Mac hit exactly the same logic the host runs locally.
 ```
 
 See `CONTRIBUTING` notes inline in each module's docstring.
@@ -139,11 +156,18 @@ weights needed on these boxes:
 ```python
 from harness.client import HarnessClient
 
-hc = HarnessClient("http://192.168.1.50:8000")
+hc = HarnessClient("http://192.168.1.50:8000")      # the host running `harness serve`
 print(hc.health())                                  # which backends are live
+print(hc.ask("How does the JEPA bridge feed the LLM?"))   # RAG over the host's index
 print(hc.chat("Inspect the current state and report health."))
 print(hc.perceive("examples/state.json"))
+# or the generic router entry point:
+print(hc.route("ask", {"question": "what is the harness router?"}))
 ```
+
+Index the knowledge once on the host (`harness ingest README.md harness`), then
+every client `ask` is answered by the host's Ollama model, grounded in that
+index — all through the same router.
 
 Topology:
 

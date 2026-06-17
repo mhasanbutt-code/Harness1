@@ -21,28 +21,28 @@ from harness.config import HarnessConfig
 
 
 def _cmd_perceive(args: argparse.Namespace, config: HarnessConfig) -> int:
-    from harness.jepa.interface import JEPABridge
+    from harness.router import HarnessRouter
 
-    bridge = JEPABridge(config)
-    desc = bridge.describe(args.input)
-    print(desc.as_prompt_block())
-    print(f"\n(encoder backend: {bridge.encoder.backend})")
+    router = HarnessRouter(config)
+    out = router.route("perceive", {"input": args.input}).output
+    print(out["prompt_block"])
+    print(f"\n(jepa backend: {router.bridge.encoder.backend})")
     return 0
 
 
 def _cmd_chat(args: argparse.Namespace, config: HarnessConfig) -> int:
-    from harness.agents.agent import Agent
+    from harness.router import HarnessRouter
 
-    agent = Agent(config)
-    result = agent.run(args.goal)
-    print(result.answer)
+    router = HarnessRouter(config)
+    out = router.route("chat", {"goal": args.goal, "trace": args.trace}).output
+    print(out["answer"])
     if args.trace:
         print("\n--- trace ---", file=sys.stderr)
-        for i, step in enumerate(result.steps, 1):
-            print(f"[{i}] action={step.action!r} input={step.action_input!r}", file=sys.stderr)
-            if step.observation:
-                print(f"    observation: {step.observation.splitlines()[0]}", file=sys.stderr)
-        print(f"stopped: {result.stopped_reason} after {result.num_steps} steps", file=sys.stderr)
+        for i, step in enumerate(out.get("trace", []), 1):
+            print(f"[{i}] action={step['action']!r} input={step['input']!r}", file=sys.stderr)
+            if step["observation"]:
+                print(f"    observation: {step['observation'].splitlines()[0]}", file=sys.stderr)
+        print(f"stopped: {out['stopped_reason']}", file=sys.stderr)
     return 0
 
 
@@ -71,31 +71,27 @@ def _cmd_eval(args: argparse.Namespace, config: HarnessConfig) -> int:
 
 
 def _cmd_ingest(args: argparse.Namespace, config: HarnessConfig) -> int:
-    from harness.rag.pipeline import RAG
+    from harness.router import HarnessRouter
 
-    rag = RAG(config)
-    if args.append and config.rag_store_path.exists():
-        rag.load()
-    n = rag.ingest(args.paths)
-    rag.save()
-    print(f"Ingested {n} chunk(s) from {len(args.paths)} path(s) -> {config.rag_store_path}")
-    print(f"(embedder backend: {rag.embedder.backend}, total chunks: {len(rag.store)})")
+    router = HarnessRouter(config)
+    out = router.route("ingest", {"paths": args.paths, "append": args.append}).output
+    print(f"Ingested {out['ingested']} chunk(s) from {len(args.paths)} path(s) -> {config.rag_store_path}")
+    print(f"(embedder backend: {out['embed_backend']}, total chunks: {out['total_chunks']})")
     return 0
 
 
 def _cmd_ask(args: argparse.Namespace, config: HarnessConfig) -> int:
-    from harness.rag.pipeline import RAG
+    from harness.router import HarnessRouter
 
     if not config.rag_store_path.exists():
         print("No index found. Run `harness ingest <paths>` first.", file=sys.stderr)
         return 2
-    rag = RAG(config).load()
-    ans = rag.ask(args.question)
-    print(ans.answer)
-    if ans.sources:
-        uniq = sorted(set(ans.sources))
-        print("\nSources: " + ", ".join(uniq), file=sys.stderr)
-    print(f"(llm backend: {rag.llm.kind})", file=sys.stderr)
+    router = HarnessRouter(config)
+    out = router.route("ask", {"question": args.question}).output
+    print(out["answer"])
+    if out["sources"]:
+        print("\nSources: " + ", ".join(out["sources"]), file=sys.stderr)
+    print(f"(llm backend: {router.llm.kind})", file=sys.stderr)
     return 0
 
 
