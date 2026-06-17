@@ -98,3 +98,67 @@ tests/                 fallback-path tests (no heavy deps required)
 ```
 
 See `CONTRIBUTING` notes inline in each module's docstring.
+
+## Running across machines (this PC, PC2, Mac)
+
+The harness runs **locally on each machine** — there's no cloud component. To
+use it from several machines, run the server on **one** box (ideally the one
+with the GPU) and have the others connect to it as clients.
+
+### 1. Set up each machine
+
+```bash
+# macOS / Linux
+git clone <your-repo-url> && cd <repo>
+./scripts/setup.sh all          # or: llm / serve / (none) for fewer deps
+```
+
+```powershell
+# Windows PowerShell
+git clone <your-repo-url>; cd <repo>
+./scripts/setup.ps1 all
+```
+
+### 2. Pick a host and run the server there
+
+On the machine that will do the heavy lifting (say its LAN IP is
+`192.168.1.50`):
+
+```bash
+make serve            # binds 0.0.0.0:8000 so the LAN can reach it
+# or: harness serve --host 0.0.0.0 --port 8000
+```
+
+Open that port in the host's firewall.
+
+### 3. Connect the other machines as clients
+
+From **PC2** and the **Mac**, point the stdlib client at the host — no torch or
+weights needed on these boxes:
+
+```python
+from harness.client import HarnessClient
+
+hc = HarnessClient("http://192.168.1.50:8000")
+print(hc.health())                                  # which backends are live
+print(hc.chat("Inspect the current state and report health."))
+print(hc.perceive("examples/state.json"))
+```
+
+Topology:
+
+```
+   ┌────────────┐        HTTP/LAN        ┌────────────┐
+   │   PC2      │ ─────────────────────▶ │  Host PC   │  harness serve
+   │ (client)   │                        │ (GPU, LLM, │  + JEPA + agents
+   └────────────┘                        │  JEPA)     │
+   ┌────────────┐        HTTP/LAN        │            │
+   │   Mac      │ ─────────────────────▶ │            │
+   │ (client)   │                        └────────────┘
+   └────────────┘
+```
+
+For access beyond the LAN, put the server behind a reverse proxy / VPN and add
+authentication — the built-in server is unauthenticated and meant for trusted
+networks.
+
