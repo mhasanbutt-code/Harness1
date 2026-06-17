@@ -11,9 +11,12 @@ Endpoints:
   POST /route              {"kind": ..., "payload": {...}} -> generic dispatch
 
 Built with `create_app(config)`; FastAPI/uvicorn are optional (`serve` extras).
-"""
 
-from __future__ import annotations
+Note: this module intentionally does NOT use ``from __future__ import
+annotations``. FastAPI must see the request-model classes as real objects (not
+lazy strings) to treat them as request bodies; with stringized annotations the
+locally-defined Pydantic models can't be resolved and become query params.
+"""
 
 from typing import Any
 

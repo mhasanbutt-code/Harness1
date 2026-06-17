@@ -29,6 +29,8 @@ serve = [
 ]
 dev = [
     "pytest>=8.0",
+    "fastapi>=0.110",
+    "httpx>=0.27",
 ]
 
 [project.scripts]
