@@ -1,0 +1,7 @@
+{
+  "component": "harness-app",
+  "status": "running",
+  "queue_depth": 3,
+  "last_error": null,
+  "agents_active": 2
+}

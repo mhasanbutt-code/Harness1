@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harness"
+version = "0.1.0"
+description = "Local-first JEPA + LLM + agent harness"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+llm = [
+    "torch>=2.1",
+    "transformers>=4.40",
+    "peft>=0.10",
+    "datasets>=2.18",
+    "accelerate>=0.29",
+    "bitsandbytes>=0.43; platform_system == 'Linux'",
+]
+serve = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2.6",
+]
+dev = [
+    "pytest>=8.0",
+    "fastapi>=0.110",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+harness = "harness.app.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["harness*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

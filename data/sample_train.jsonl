@@ -1,0 +1,5 @@
+{"instruction": "What is the JEPA encoder's role in the harness?", "response": "It turns raw inputs into abstract state embeddings that the LLM and agents reason over."}
+{"instruction": "How is the local LLM fine-tuned?", "response": "With LoRA/QLoRA adapters on domain instruction data, so it fits on a single modest GPU."}
+{"instruction": "What does the agent loop do?", "input": "ReAct style", "response": "It alternates Thought, Action, and Observation, calling tools until it produces a Final Answer."}
+{"instruction": "How does the agent perceive the world?", "response": "Through the 'perceive' tool, which runs the JEPA bridge and returns a textual state description."}
+{"instruction": "What runs the whole stack?", "response": "The harness app, available as a CLI and a FastAPI server."}
