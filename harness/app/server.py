@@ -26,7 +26,7 @@ from harness.config import HarnessConfig
 def create_app(config: HarnessConfig | None = None):
     """Construct the FastAPI app. Imports FastAPI lazily so core stays light."""
     try:
-        from fastapi import FastAPI, HTTPException
+        from fastapi import Depends, FastAPI, Header, HTTPException
         from pydantic import BaseModel
     except Exception as e:  # pragma: no cover
         raise RuntimeError(
@@ -39,7 +39,17 @@ def create_app(config: HarnessConfig | None = None):
 
     router = HarnessRouter(config)
 
-    app = FastAPI(title="Harness", version="0.1.0")
+    def _auth(authorization: str = Header(default=""), x_api_token: str = Header(default="")) -> None:
+        """Enforce the API token when one is configured; otherwise a no-op."""
+        if not config.api_token:
+            return
+        supplied = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        supplied = supplied or x_api_token
+        if supplied != config.api_token:
+            raise HTTPException(status_code=401, detail="invalid or missing API token")
+
+    # Applied to every route; disabled automatically when no token is set.
+    app = FastAPI(title="Harness", version="0.1.0", dependencies=[Depends(_auth)])
 
     class PerceiveRequest(BaseModel):
         input: Any

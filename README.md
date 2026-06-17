@@ -182,9 +182,24 @@ Topology:
    └────────────┘
 ```
 
-For access beyond the LAN, put the server behind a reverse proxy / VPN and add
-authentication — the built-in server is unauthenticated and meant for trusted
-networks.
+### Optional API token
+
+By default the server is open (fine for a trusted LAN). To require a token, set
+`HARNESS_API_TOKEN` on the host before `harness serve`:
+
+```bash
+export HARNESS_API_TOKEN=$(openssl rand -hex 16)   # on the host
+```
+
+Then every request must carry it. The client takes it directly:
+
+```python
+hc = HarnessClient("http://192.168.1.50:8000", token="<the-token>")
+```
+
+Or by header: `Authorization: Bearer <token>` (or `X-API-Token: <token>`).
+Requests without a valid token get `401`. For exposure beyond the LAN, still
+put it behind a reverse proxy / VPN with TLS.
 
 ## Teaching the model your stack (Ollama + RAG)
 

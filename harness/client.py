@@ -20,13 +20,21 @@ from typing import Any
 class HarnessClient:
     """Minimal HTTP client for the harness FastAPI server."""
 
-    def __init__(self, base_url: str = "http://127.0.0.1:8000", timeout: float = 60.0) -> None:
+    def __init__(
+        self,
+        base_url: str = "http://127.0.0.1:8000",
+        timeout: float = 60.0,
+        token: str = "",
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.token = token
 
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         data = json.dumps(payload).encode("utf-8") if payload is not None else None
         headers = {"Content-Type": "application/json"} if data else {}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
         req = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310 (trusted LAN URL)
             return json.loads(resp.read().decode("utf-8"))

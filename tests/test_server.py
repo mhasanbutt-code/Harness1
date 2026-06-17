@@ -61,3 +61,32 @@ def test_route_dispatch_and_errors(tmp_path):
     assert ok.status_code == 200
     bad = client.post("/route", json={"kind": "bogus", "payload": {}})
     assert bad.status_code == 400
+
+
+def test_no_auth_by_default(tmp_path):
+    # No token configured -> open access.
+    assert _client(tmp_path).get("/health").status_code == 200
+
+
+def test_auth_enforced_when_token_set(tmp_path):
+    cfg = HarnessConfig(
+        llm_backend="echo",
+        embed_backend="hash",
+        embed_dim=64,
+        jepa_embed_dim=32,
+        rag_store_path=tmp_path / "store",
+        api_token="s3cret",
+    )
+    client = TestClient(create_app(cfg))
+
+    assert client.get("/health").status_code == 401
+    assert client.post("/perceive", json={"input": "x"}).status_code == 401
+
+    good = {"Authorization": "Bearer s3cret"}
+    assert client.get("/health", headers=good).status_code == 200
+    assert client.post("/perceive", json={"input": "x"}, headers=good).status_code == 200
+
+    # X-API-Token header is also accepted.
+    assert client.get("/health", headers={"X-API-Token": "s3cret"}).status_code == 200
+    # Wrong token rejected.
+    assert client.get("/health", headers={"Authorization": "Bearer nope"}).status_code == 401

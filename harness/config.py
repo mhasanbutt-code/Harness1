@@ -73,6 +73,11 @@ class HarnessConfig:
     rag_top_k: int = 4
     rag_store_path: Path = Path("outputs/rag_store")
 
+    # --- Server auth (optional) ---
+    # If non-empty, the HTTP server requires this token on every request via
+    # `Authorization: Bearer <token>` or `X-API-Token`. Empty = no auth.
+    api_token: str = ""
+
     # --- Paths ---
     data_dir: Path = Path("data")
     output_dir: Path = Path("outputs")
