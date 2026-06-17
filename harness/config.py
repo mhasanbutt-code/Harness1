@@ -62,7 +62,7 @@ class HarnessConfig:
     # echo stub. Set explicitly to pin a backend.
     llm_backend: str = "auto"  # auto | ollama | transformers | echo
     ollama_host: str = "http://127.0.0.1:11434"
-    ollama_model: str = "qwen3"
+    ollama_model: str = "qwen3:32b"
 
     # --- RAG (retrieval over project knowledge) ---
     embed_backend: str = "auto"  # auto | ollama | hash

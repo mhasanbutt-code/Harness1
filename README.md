@@ -198,11 +198,11 @@ serve with [Ollama](https://ollama.com).
 ### Point the harness at your Ollama model
 
 ```bash
-ollama pull qwen3                 # your chat model
+ollama pull qwen3:32b             # your chat model
 ollama pull nomic-embed-text      # embeddings for RAG (optional but better)
 
 export HARNESS_LLM_BACKEND=ollama
-export HARNESS_OLLAMA_MODEL=qwen3 # use your exact `ollama list` tag
+export HARNESS_OLLAMA_MODEL=qwen3:32b   # default; override to your `ollama list` tag
 export HARNESS_EMBED_BACKEND=ollama
 ```
 
