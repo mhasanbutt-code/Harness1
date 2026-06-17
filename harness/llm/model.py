@@ -35,6 +35,15 @@ class LocalLLM:
             self.load()
         return self._kind
 
+    def active_model(self) -> str:
+        """The concrete model name in use for the resolved backend."""
+        kind = self.kind
+        if kind == "ollama":
+            return self._model.model  # type: ignore[union-attr]
+        if kind == "transformers":
+            return self.config.base_model
+        return "echo"
+
     # ------------------------------------------------------------------ #
     # Loading / backend resolution
     # ------------------------------------------------------------------ #
@@ -58,6 +67,7 @@ class LocalLLM:
 
             ol = OllamaLLM(self.config.ollama_host, self.config.ollama_model)
             if ol.available():
+                ol.ensure_model()  # snap to whatever Qwen3 tag is installed
                 self._model, self._tokenizer, self._kind = ol, None, "ollama"
                 return True
         except Exception:

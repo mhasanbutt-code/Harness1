@@ -2,7 +2,24 @@
 
 from harness.config import HarnessConfig
 from harness.llm.model import LocalLLM
-from harness.llm.ollama import OllamaLLM, ping
+from harness.llm.ollama import OllamaLLM, ping, select_model
+
+
+def test_select_model_exact_match():
+    assert select_model("qwen3:32b", ["qwen3:32b", "llama3"]) == "qwen3:32b"
+
+
+def test_select_model_same_family():
+    # Requested tag absent, but a qwen3:* model is installed -> use it.
+    assert select_model("qwen3:32b", ["qwen3:8b", "nomic-embed-text"]) == "qwen3:8b"
+
+
+def test_select_model_skips_embedding_models():
+    assert select_model("qwen3:32b", ["nomic-embed-text", "llama3:8b"]) == "llama3:8b"
+
+
+def test_select_model_empty_keeps_requested():
+    assert select_model("qwen3:32b", []) == "qwen3:32b"
 
 
 def test_ping_unreachable_host_is_false():

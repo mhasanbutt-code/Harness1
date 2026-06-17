@@ -47,6 +47,37 @@ def ping(host: str, timeout: float = 3.0) -> bool:
         return False
 
 
+def list_models(host: str, timeout: float = 3.0) -> list[str]:
+    """Return the model tags currently available in the Ollama daemon."""
+    try:
+        req = urllib.request.Request(f"{host.rstrip('/')}/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            out = json.loads(resp.read().decode("utf-8"))
+        return [m.get("name", "") for m in out.get("models", []) if m.get("name")]
+    except Exception:
+        return []
+
+
+def select_model(requested: str, available: list[str]) -> str:
+    """Pick the best matching model tag from what's actually installed.
+
+    Order of preference: exact match -> same family (same name before ':',
+    e.g. a requested ``qwen3:32b`` matches an installed ``qwen3:8b``) ->
+    first non-embedding chat model -> the requested string unchanged (so a
+    daemon that doesn't list tags still gets a best effort).
+    """
+    if not available:
+        return requested
+    if requested in available:
+        return requested
+    base = requested.split(":")[0].lower()
+    family = [m for m in available if m.split(":")[0].lower() == base]
+    if family:
+        return family[0]
+    chat = [m for m in available if "embed" not in m.lower()]
+    return chat[0] if chat else available[0]
+
+
 class OllamaLLM:
     """Generation interface backed by an Ollama-served model."""
 
@@ -57,6 +88,11 @@ class OllamaLLM:
 
     def available(self) -> bool:
         return ping(self.host)
+
+    def ensure_model(self) -> str:
+        """Resolve ``self.model`` to a tag that's actually installed."""
+        self.model = select_model(self.model, list_models(self.host))
+        return self.model
 
     def _options(self, overrides: dict[str, Any]) -> dict[str, Any]:
         opts: dict[str, Any] = {}

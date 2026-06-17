@@ -76,6 +76,7 @@ class HarnessRouter:
             "embed_backend": self.rag.embedder.backend,
             "base_model": self.config.base_model,
             "ollama_model": self.config.ollama_model,
+            "active_model": self.llm.active_model(),
             "indexed_chunks": len(self.rag.store),
         }
 
