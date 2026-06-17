@@ -70,6 +70,35 @@ def _cmd_eval(args: argparse.Namespace, config: HarnessConfig) -> int:
     return 0
 
 
+def _cmd_ingest(args: argparse.Namespace, config: HarnessConfig) -> int:
+    from harness.rag.pipeline import RAG
+
+    rag = RAG(config)
+    if args.append and config.rag_store_path.exists():
+        rag.load()
+    n = rag.ingest(args.paths)
+    rag.save()
+    print(f"Ingested {n} chunk(s) from {len(args.paths)} path(s) -> {config.rag_store_path}")
+    print(f"(embedder backend: {rag.embedder.backend}, total chunks: {len(rag.store)})")
+    return 0
+
+
+def _cmd_ask(args: argparse.Namespace, config: HarnessConfig) -> int:
+    from harness.rag.pipeline import RAG
+
+    if not config.rag_store_path.exists():
+        print("No index found. Run `harness ingest <paths>` first.", file=sys.stderr)
+        return 2
+    rag = RAG(config).load()
+    ans = rag.ask(args.question)
+    print(ans.answer)
+    if ans.sources:
+        uniq = sorted(set(ans.sources))
+        print("\nSources: " + ", ".join(uniq), file=sys.stderr)
+    print(f"(llm backend: {rag.llm.kind})", file=sys.stderr)
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace, config: HarnessConfig) -> int:
     try:
         import uvicorn
@@ -105,6 +134,15 @@ def build_parser() -> argparse.ArgumentParser:
     se.add_argument("--data", required=True, help="JSONL eval file")
     se.add_argument("--show-samples", action="store_true")
     se.set_defaults(func=_cmd_eval)
+
+    si = sub.add_parser("ingest", help="index documents for RAG over project knowledge")
+    si.add_argument("paths", nargs="+", help="files or directories to index")
+    si.add_argument("--append", action="store_true", help="add to the existing index")
+    si.set_defaults(func=_cmd_ingest)
+
+    sa = sub.add_parser("ask", help="ask a question grounded in ingested docs (RAG)")
+    sa.add_argument("question", help="the question to answer from indexed knowledge")
+    sa.set_defaults(func=_cmd_ask)
 
     sv = sub.add_parser("serve", help="run the HTTP server")
     sv.add_argument("--host", default="127.0.0.1")

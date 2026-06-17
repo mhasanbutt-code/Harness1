@@ -57,6 +57,22 @@ class HarnessConfig:
     # --- Agent loop ---
     max_agent_steps: int = 8
 
+    # --- LLM backend selection ---
+    # auto: prefer a running Ollama, then transformers, then a deterministic
+    # echo stub. Set explicitly to pin a backend.
+    llm_backend: str = "auto"  # auto | ollama | transformers | echo
+    ollama_host: str = "http://127.0.0.1:11434"
+    ollama_model: str = "qwen3"
+
+    # --- RAG (retrieval over project knowledge) ---
+    embed_backend: str = "auto"  # auto | ollama | hash
+    embed_model: str = "nomic-embed-text"
+    embed_dim: int = 512
+    rag_chunk_size: int = 800
+    rag_chunk_overlap: int = 120
+    rag_top_k: int = 4
+    rag_store_path: Path = Path("outputs/rag_store")
+
     # --- Paths ---
     data_dir: Path = Path("data")
     output_dir: Path = Path("outputs")
@@ -99,6 +115,7 @@ class HarnessConfig:
         self.data_dir = Path(self.data_dir)
         self.output_dir = Path(self.output_dir)
         self.adapter_dir = Path(self.adapter_dir)
+        self.rag_store_path = Path(self.rag_store_path)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

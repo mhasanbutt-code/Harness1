@@ -162,3 +162,53 @@ For access beyond the LAN, put the server behind a reverse proxy / VPN and add
 authentication — the built-in server is unauthenticated and meant for trusted
 networks.
 
+## Teaching the model your stack (Ollama + RAG)
+
+To make the local model *know* the harness/JEPA project, prefer **RAG over
+fine-tuning**. Fine-tuning a small model on a little doc set tends to
+hallucinate and forget, and must be redone whenever docs change. RAG indexes
+your docs once and grounds every answer in the most relevant chunks — current,
+citable, and no GPU training. It also rides directly on a model you already
+serve with [Ollama](https://ollama.com).
+
+### Point the harness at your Ollama model
+
+```bash
+ollama pull qwen3                 # your chat model
+ollama pull nomic-embed-text      # embeddings for RAG (optional but better)
+
+export HARNESS_LLM_BACKEND=ollama
+export HARNESS_OLLAMA_MODEL=qwen3 # use your exact `ollama list` tag
+export HARNESS_EMBED_BACKEND=ollama
+```
+
+The backend resolves automatically: `auto` uses Ollama if it's running, then
+`transformers`, then a deterministic echo stub. The embedder falls back to an
+offline lexical hashing embedder if no embed model is available, so RAG works
+even with nothing pulled.
+
+### Index the project, then ask
+
+```bash
+harness ingest README.md harness            # chunk + embed the docs
+harness ask "How does the JEPA bridge feed state to the LLM?"
+```
+
+`ask` retrieves the top-k chunks, grounds the prompt in them, answers with your
+Ollama model, and prints the source files it used.
+
+### When you *do* want fine-tuning
+
+For changing the model's *behavior/style* (not facts), use the LoRA path with
+the `transformers` backend:
+
+```bash
+pip install -e ".[llm]"
+harness train --data data/train.jsonl --epochs 3   # saves a LoRA adapter
+harness eval  --data data/val.jsonl
+```
+
+Ollama itself does inference only; to serve a LoRA-tuned model through Ollama,
+merge the adapter into the base weights, convert to GGUF, and import it with a
+`Modelfile`.
+
